@@ -39,7 +39,7 @@
         // ここでn8nに送る（次のステップ）
        <script>
 async function sendToN8n(text) {
-  await fetch("https://あなたのn8nドメイン/webhook/reception-voice", {
+  await fetch("https://n8n.srv1050188.hstgr.cloud/webhook-test/reception", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -63,5 +63,6 @@ async function sendToN8n(text) {
 
 </body>
 </html>
+
 
 
