@@ -35,9 +35,7 @@
       recognition.onresult = function(event) {
         const text = event.results[0][0].transcript;
         document.getElementById('result').innerText = text;
-      };
-    }
-  </script>
+   
         // ここでn8nに送る（次のステップ）
        <script>
 async function sendToN8n(text) {
@@ -53,11 +51,15 @@ async function sendToN8n(text) {
   });
 }
 </script>
+     };
+    }
+  </script>
 
 
 
 </body>
 </html>
+
 
 
 
