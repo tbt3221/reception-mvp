@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>受付</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding-top: 100px;
+    }
+    button {
+      font-size: 24px;
+      padding: 20px 40px;
+    }
+    #result {
+      margin-top: 30px;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>ご用件をお話しください</h1>
+  <button onclick="startSpeech()">話す</button>
+
+  <div id="result"></div>
+
+  <script>
+    function startSpeech() {
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = 'ja-JP';
+      recognition.start();
+
+      recognition.onresult = function(event) {
+        const text = event.results[0][0].transcript;
+        document.getElementById('result').innerText = text;
+
+        // ここでn8nに送る（次のステップ）
+      };
+    }
+  </script>
+
+</body>
+</html>
