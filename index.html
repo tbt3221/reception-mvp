@@ -37,19 +37,31 @@
         document.getElementById('result').innerText = text;
 
         // ここでn8nに送る（次のステップ）
-        fetch("https://n8n.srv1050188.hstgr.cloud/webhook-test/reception", {
-        method: "POST",
-        headers: {
-        "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-        message: text
-        })
-        });
+       <script>
+async function sendToN8n(text) {
+  await fetch("https://あなたのn8nドメイン/webhook/reception-voice", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      text: text,
+      time: new Date().toISOString()
+    })
+  });
+}
+</script>
+
+  recognition.onresult = function(event) {
+  const text = event.results[0][0].transcript;
+  sendToN8n(text);
+};
+
       };
     }
   </script>
 
 </body>
 </html>
+
 
