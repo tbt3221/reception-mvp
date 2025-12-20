@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>受付</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       font-family: sans-serif;
       text-align: center;
-      padding-top: 100px;
+      padding-top: 80px;
     }
     button {
       font-size: 24px;
@@ -16,6 +17,11 @@
     #result {
       margin-top: 30px;
       font-size: 20px;
+      color: #333;
+    }
+    #status {
+      margin-top: 20px;
+      color: green;
     }
   </style>
 </head>
@@ -25,43 +31,56 @@
   <button onclick="startSpeech()">話す</button>
 
   <div id="result"></div>
+  <div id="status"></div>
 
   <script>
     function startSpeech() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert('このブラウザは音声入力に対応していません');
+        return;
+      }
+
       const recognition = new webkitSpeechRecognition();
       recognition.lang = 'ja-JP';
+      recognition.interimResults = false;
+      recognition.continuous = false;
+
+      document.getElementById('status').innerText = '聞き取り中...';
+
       recognition.start();
 
       recognition.onresult = function(event) {
         const text = event.results[0][0].transcript;
         document.getElementById('result').innerText = text;
-   
-        // ここでn8nに送る（次のステップ）
-       <script>
-async function sendToN8n(text) {
-  await fetch("https://n8n.srv1050188.hstgr.cloud/webhook-test/reception", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      text: text,
-      time: new Date().toISOString()
-    })
-  });
-}
-</script>
-     };
+
+        sendToN8n(text);
+      };
+
+      recognition.onerror = function() {
+        document.getElementById('status').innerText = '音声認識に失敗しました';
+      };
+    }
+
+    function sendToN8n(text) {
+      fetch('https://n8n.srv1050188.hstgr.cloud/webhook-test/reception', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: text,
+          source: 'reception-ipad',
+          timestamp: new Date().toISOString()
+        })
+      })
+      .then(() => {
+        document.getElementById('status').innerText = 'スタッフに通知しました';
+      })
+      .catch(() => {
+        document.getElementById('status').innerText = '送信に失敗しました';
+      });
     }
   </script>
 
-
-
 </body>
 </html>
-
-
-
-
-
-
