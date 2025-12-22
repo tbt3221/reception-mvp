@@ -8,11 +8,12 @@
     body {
       font-family: sans-serif;
       text-align: center;
-      padding-top: 80px;
+      padding-top: 60px;
     }
     button {
-      font-size: 24px;
-      padding: 20px 40px;
+      font-size: 22px;
+      padding: 18px 30px;
+      margin: 10px;
     }
     #result {
       margin-top: 30px;
@@ -23,17 +24,30 @@
       margin-top: 20px;
       color: green;
     }
+    .purpose-buttons {
+      margin-top: 30px;
+    }
   </style>
 </head>
 <body>
 
   <h1>ご用件をお話しください</h1>
+
   <button onclick="startSpeech()">話す</button>
+
+  <div class="purpose-buttons">
+    <button onclick="sendPurpose('面会に来ました')">面会</button>
+    <button onclick="sendPurpose('入所・利用の相談です')">入所相談</button>
+    <button onclick="sendPurpose('配達です')">配達</button>
+    <button onclick="sendPurpose('その他のご用件です')">その他</button>
+  </div>
 
   <div id="result"></div>
   <div id="status"></div>
 
   <script>
+    let clearTimer;
+
     function startSpeech() {
       if (!('webkitSpeechRecognition' in window)) {
         alert('このブラウザは音声入力に対応していません');
@@ -51,14 +65,30 @@
 
       recognition.onresult = function(event) {
         const text = event.results[0][0].transcript;
-        document.getElementById('result').innerText = text;
-
+        showResult(text);
         sendToN8n(text);
       };
 
       recognition.onerror = function() {
         document.getElementById('status').innerText = '音声認識に失敗しました';
       };
+    }
+
+    function sendPurpose(text) {
+      showResult(text);
+      sendToN8n(text);
+    }
+
+    function showResult(text) {
+      document.getElementById('result').innerText = text;
+      document.getElementById('status').innerText = '';
+
+      // 表示を自動消去（15秒）
+      clearTimeout(clearTimer);
+      clearTimer = setTimeout(() => {
+        document.getElementById('result').innerText = '';
+        document.getElementById('status').innerText = '';
+      }, 15000);
     }
 
     function sendToN8n(text) {
@@ -84,3 +114,4 @@
 
 </body>
 </html>
+
