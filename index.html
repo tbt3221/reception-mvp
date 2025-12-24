@@ -7,127 +7,144 @@
 
   <style>
     body {
-      font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      font-family: sans-serif;
       text-align: center;
-      background: #f5f7fa;
       padding: 40px 20px;
+      background: #f7f7f7;
     }
 
     h1 {
       font-size: 32px;
-      margin-bottom: 40px;
+      margin-bottom: 30px;
     }
 
-    button {
-      width: 90%;
-      max-width: 500px;
-      font-size: 32px;
-      padding: 30px;
-      border-radius: 16px;
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 600px;
+      margin: 0 auto 40px;
+    }
+
+    .btn {
+      font-size: 28px;
+      padding: 30px 10px;
+      border-radius: 12px;
       border: none;
-      background: #007aff;
-      color: #fff;
-      cursor: pointer;
+      background: #1976d2;
+      color: white;
     }
 
-    button:active {
-      background: #005fcc;
+    .btn:active {
+      background: #125aa0;
+    }
+
+    .mic-btn {
+      font-size: 32px;
+      padding: 30px 60px;
+      border-radius: 50px;
+      border: none;
+      background: #e53935;
+      color: white;
     }
 
     #result {
-      margin-top: 40px;
-      font-size: 28px;
-      background: #ffffff;
-      padding: 24px;
-      border-radius: 12px;
-      min-height: 80px;
+      margin-top: 30px;
+      font-size: 24px;
+      color: #333;
+      min-height: 2em;
     }
 
     #status {
       margin-top: 20px;
-      font-size: 24px;
-      font-weight: bold;
+      font-size: 22px;
+      color: green;
+      min-height: 1.5em;
     }
-
-    .status-wait { color: #007aff; }
-    .status-success { color: #2e7d32; }
-    .status-error { color: #c62828; }
   </style>
 </head>
-
 <body>
 
-  <h1>ご用件をお話しください</h1>
+  <h1>ご用件を選ぶか、話してください</h1>
 
-  <button onclick="startSpeech()">話す</button>
+  <!-- ボタン選択 -->
+  <div class="buttons">
+    <button class="btn" onclick="sendPreset('面会に来ました')">面 会</button>
+    <button class="btn" onclick="sendPreset('お届け物です')">お届け物</button>
+    <button class="btn" onclick="sendPreset('見学・相談です')">見学・相談</button>
+    <button class="btn" onclick="startSpeech()">その他</button>
+  </div>
+
+  <!-- 音声 -->
+  <button class="mic-btn" onclick="startSpeech()">🎤 話す</button>
 
   <div id="result"></div>
   <div id="status"></div>
 
-  <script>
-    let clearTimer;
+<script>
+  let clearTimer = null;
 
-    function startSpeech() {
-      if (!('webkitSpeechRecognition' in window)) {
-        alert('この端末は音声入力に対応していません');
-        return;
-      }
+  function showResult(text) {
+    document.getElementById('result').innerText = text;
 
-      const recognition = new webkitSpeechRecognition();
-      recognition.lang = 'ja-JP';
-      recognition.interimResults = false;
-      recognition.continuous = false;
-
-      setStatus('聞き取り中...', 'status-wait');
+    // 30秒後に自動消去（個人情報対策）
+    if (clearTimer) clearTimeout(clearTimer);
+    clearTimer = setTimeout(() => {
       document.getElementById('result').innerText = '';
+    }, 30000);
+  }
 
-      recognition.start();
-
-      recognition.onresult = function(event) {
-        const text = event.results[0][0].transcript;
-        document.getElementById('result').innerText = text;
-
-        sendToN8n(text);
-        autoClear();
-      };
-
-      recognition.onerror = function() {
-        setStatus('音声認識に失敗しました', 'status-error');
-      };
+  function startSpeech() {
+    if (!('webkitSpeechRecognition' in window)) {
+      alert('このブラウザは音声入力に対応していません');
+      return;
     }
 
-    function sendToN8n(text) {
-      fetch('https://n8n.srv1050188.hstgr.cloud/webhook/reception', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          source: 'reception-ipad',
-          timestamp: new Date().toISOString()
-        })
+    const recognition = new webkitSpeechRecognition();
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    document.getElementById('status').innerText = '聞き取り中...';
+
+    recognition.start();
+
+    recognition.onresult = function(event) {
+      const text = event.results[0][0].transcript;
+      showResult(text);
+      sendToN8n(text);
+    };
+
+    recognition.onerror = function() {
+      document.getElementById('status').innerText = '音声認識に失敗しました';
+    };
+  }
+
+  function sendPreset(text) {
+    showResult(text);
+    sendToN8n(text);
+  }
+
+  function sendToN8n(text) {
+    fetch('https://n8n.srv1050188.hstgr.cloud/webhook/reception', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: text,
+        source: 'reception-ipad',
+        timestamp: new Date().toISOString()
       })
-      .then(() => {
-        setStatus('スタッフに送信しました', 'status-success');
-      })
-      .catch(() => {
-        setStatus('送信に失敗しました', 'status-error');
-      });
-    }
-
-    function setStatus(text, className) {
-      const status = document.getElementById('status');
-      status.innerText = text;
-      status.className = className;
-    }
-
-    function autoClear() {
-      clearTimeout(clearTimer);
-      clearTimer = setTimeout(() => {
-        document.getElementById('result').innerText = '';
-        document.getElementById('status').innerText = '';
-      }, 15000); // 15秒後に自動消去
-    }
-  </script>
+    })
+    .then(() => {
+      document.getElementById('status').innerText = 'スタッフに通知しました';
+    })
+    .catch(() => {
+      document.getElementById('status').innerText = '送信に失敗しました';
+    });
+  }
+</script>
 
 </body>
 </html>
