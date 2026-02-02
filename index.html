@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>受付</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
     body {
       font-family: sans-serif;
@@ -12,20 +11,17 @@
       padding: 40px 20px;
       background: #f7f7f7;
     }
-
     h1 {
       font-size: 32px;
       margin-bottom: 30px;
     }
-
     .buttons {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
       max-width: 600px;
-      margin: 0 auto 40px;
+      margin: 0 auto 30px;
     }
-
     .btn {
       font-size: 28px;
       padding: 30px 10px;
@@ -33,60 +29,110 @@
       border: none;
       background: #1976d2;
       color: white;
+      cursor: pointer;
     }
-
     .btn:active {
       background: #125aa0;
     }
-
-    .mic-btn {
-      font-size: 32px;
-      padding: 30px 60px;
-      border-radius: 50px;
-      border: none;
-      background: #e53935;
-      color: white;
+    .other-label {
+      font-size: 24px;
+      color: #333;
+      margin: 30px 0 15px;
     }
-
+    .voice-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .voice-btn {
+      font-size: 24px;
+      padding: 20px 40px;
+      border-radius: 12px;
+      border: none;
+      color: white;
+      cursor: pointer;
+      min-width: 160px;
+    }
+    .start-btn {
+      background: #1976d2;
+    }
+    .start-btn:active {
+      background: #125aa0;
+    }
+    .start-btn:disabled {
+      background: #90caf9;
+      cursor: not-allowed;
+    }
+    .stop-btn {
+      background: #e53935;
+    }
+    .stop-btn:active {
+      background: #b71c1c;
+    }
+    .stop-btn:disabled {
+      background: #ef9a9a;
+      cursor: not-allowed;
+    }
     #result {
       margin-top: 30px;
       font-size: 24px;
       color: #333;
       min-height: 2em;
     }
-
     #status {
       margin-top: 20px;
       font-size: 22px;
       color: green;
       min-height: 1.5em;
     }
+    #waitMessage {
+      margin-top: 30px;
+      font-size: 28px;
+      color: #1976d2;
+      font-weight: bold;
+      min-height: 1.5em;
+    }
+    #listening-indicator {
+      font-size: 20px;
+      color: #e53935;
+      margin-top: 10px;
+      min-height: 1.5em;
+    }
   </style>
 </head>
 <body>
-
-  <h1>ご用件を選ぶか、話してください</h1>
-
+  <h1>ご用件を選んでください</h1>
+  
   <!-- ボタン選択 -->
   <div class="buttons">
     <button class="btn" onclick="sendPreset('面会に来ました')">面 会</button>
     <button class="btn" onclick="sendPreset('お届け物です')">お届け物</button>
     <button class="btn" onclick="sendPreset('見学・相談です')">見学・相談</button>
-    <button class="btn" onclick="startSpeech()">その他</button>
+    <button class="btn" onclick="sendPreset('業者です')">業 者</button>
   </div>
-
-  <!-- 音声 -->
-  <button class="mic-btn" onclick="startSpeech()">🎤 話す</button>
-
+  
+  <!-- 音声入力セクション -->
+  <div class="other-label">その他要件をお話しください</div>
+  <div class="voice-buttons">
+    <button class="voice-btn start-btn" id="startBtn" onclick="startListening()">🎤 話し始める</button>
+    <button class="voice-btn stop-btn" id="stopBtn" onclick="stopListening()" disabled>話し終わる</button>
+  </div>
+  <div id="listening-indicator"></div>
+  
   <div id="result"></div>
   <div id="status"></div>
+  <div id="waitMessage"></div>
 
 <script>
   let clearTimer = null;
+  let recognition = null;
+  let autoStopTimer = null;
+  let currentTranscript = '';
+  let isListening = false;
 
   function showResult(text) {
     document.getElementById('result').innerText = text;
-
     // 30秒後に自動消去（個人情報対策）
     if (clearTimer) clearTimeout(clearTimer);
     clearTimer = setTimeout(() => {
@@ -94,35 +140,123 @@
     }, 30000);
   }
 
-  function startSpeech() {
+  function showWaitMessage() {
+    const waitMsg = document.getElementById('waitMessage');
+    waitMsg.innerText = '担当者をお待ちください';
+    setTimeout(() => {
+      waitMsg.innerText = '';
+    }, 10000);
+  }
+
+  function startListening() {
     if (!('webkitSpeechRecognition' in window)) {
       alert('このブラウザは音声入力に対応していません');
       return;
     }
 
-    const recognition = new webkitSpeechRecognition();
-    recognition.lang = 'ja-JP';
-    recognition.interimResults = false;
-    recognition.continuous = false;
+    // 初期化
+    currentTranscript = '';
+    isListening = true;
+    
+    // ボタンの状態を更新
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+    document.getElementById('listening-indicator').innerText = '🔴 聞き取り中...';
+    document.getElementById('status').innerText = '';
+    document.getElementById('result').innerText = '';
 
-    document.getElementById('status').innerText = '聞き取り中...';
+    // 音声認識の設定
+    recognition = new webkitSpeechRecognition();
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = true;  // 途中結果も取得
+    recognition.continuous = true;      // 継続的に認識
+
+    recognition.onresult = function(event) {
+      let interim = '';
+      let final = '';
+      
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      
+      currentTranscript = final || interim;
+      document.getElementById('result').innerText = currentTranscript + (interim && final ? interim : '');
+    };
+
+    recognition.onerror = function(e) {
+      console.log('Recognition error:', e.error);
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        document.getElementById('status').innerText = '音声認識に失敗しました';
+        resetButtons();
+      }
+    };
+
+    recognition.onend = function() {
+      // 自動的に終了した場合（20秒タイムアウトなど）
+      if (isListening) {
+        // まだリスニング状態なら、音声が途切れただけなので再開
+        try {
+          recognition.start();
+        } catch (e) {
+          // 既に停止処理が走っている場合は何もしない
+        }
+      }
+    };
 
     recognition.start();
 
-    recognition.onresult = function(event) {
-      const text = event.results[0][0].transcript;
-      showResult(text);
-      sendToN8n(text);
-    };
+    // 20秒後に自動停止
+    autoStopTimer = setTimeout(() => {
+      if (isListening) {
+        stopListening();
+      }
+    }, 20000);
+  }
 
-    recognition.onerror = function() {
-      document.getElementById('status').innerText = '音声認識に失敗しました';
-    };
+  function stopListening() {
+    isListening = false;
+    
+    // タイマーをクリア
+    if (autoStopTimer) {
+      clearTimeout(autoStopTimer);
+      autoStopTimer = null;
+    }
+
+    // 音声認識を停止
+    if (recognition) {
+      recognition.onend = null;  // 再開を防止
+      recognition.stop();
+      recognition = null;
+    }
+
+    // ボタンの状態をリセット
+    resetButtons();
+
+    // テキストがあれば送信
+    if (currentTranscript.trim()) {
+      showResult(currentTranscript);
+      sendToN8n(currentTranscript);
+      showWaitMessage();
+    } else {
+      document.getElementById('status').innerText = '音声が入力されませんでした';
+    }
+  }
+
+  function resetButtons() {
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('listening-indicator').innerText = '';
+    isListening = false;
   }
 
   function sendPreset(text) {
     showResult(text);
     sendToN8n(text);
+    showWaitMessage();
   }
 
   function sendToN8n(text) {
@@ -145,6 +279,5 @@
     });
   }
 </script>
-
 </body>
 </html>
